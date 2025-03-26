@@ -26,6 +26,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 # Приложение будет доступно на http://localhost:8000
 ```
 
+Тесты:
+
+```bash
+pytest
+```
+
 ## Или при использовании Docker
 
 ### Требования
