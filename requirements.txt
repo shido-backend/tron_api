@@ -1,0 +1,7 @@
+fastapi==0.95.2
+uvicorn==0.22.0
+sqlalchemy==2.0.15
+tronpy==2.4.0
+python-dotenv==1.0.0
+pybreaker==1.0.0
+EOT
