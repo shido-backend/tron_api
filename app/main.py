@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from app.api.endpoints import router
 from app.config import settings
+from app.utils.logging.logging import setup_logging
+
+setup_logging()
 
 app = FastAPI(
     title="Tron Wallet Info Service",

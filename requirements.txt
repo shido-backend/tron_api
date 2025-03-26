@@ -6,3 +6,4 @@ python-dotenv==1.0.0
 pybreaker==1.0.0
 EOT
 pydantic-settings
+tenacity>=8.2.3

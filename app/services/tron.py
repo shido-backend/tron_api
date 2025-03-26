@@ -1,17 +1,28 @@
-from tronpy import Tron
-from tronpy.providers import HTTPProvider
-from app.config import settings
-from app.models import WalletQuery
+from typing import Optional
+from app.utils.tron_client import initialize_tron_client
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from app.schemas import WalletInfo
-from sqlalchemy.orm import Session
+from app.api.errors import TronAPIError
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TronService:
     def __init__(self):
-        network = settings.tron_network
-        if network == "mainnet":
-            self.client = Tron(HTTPProvider("https://api.trongrid.io"))
-        else:
-            self.client = Tron(HTTPProvider("https://api.shasta.trongrid.io"))
+        self.client = initialize_tron_client()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        reraise=True
+    )
+    def _safe_api_call(self, method: callable, *args, **kwargs):
+        try:
+            return method(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"API call failed: {str(e)}")
+            raise
 
     def get_wallet_info(self, address: str) -> WalletInfo:
         try:
@@ -25,39 +36,15 @@ class TronService:
                 trx_balance=balance if balance is not None else None
             )
         except Exception as e:
-            return WalletInfo(
-                address=address,
-                bandwidth=None,
-                energy=None,
-                trx_balance=None
-            )
+            logger.error(f"Tron API error for {address}: {str(e)}")
+            raise TronAPIError(f"API request failed: {str(e)}")
 
-class DatabaseService:
-    @staticmethod
-    def create_wallet_query(db: Session, wallet_info: WalletInfo) -> WalletQuery:
-        db_query = WalletQuery(
-            address=wallet_info.address,
-            bandwidth=wallet_info.bandwidth,
-            energy=wallet_info.energy,
-            trx_balance=wallet_info.trx_balance
-        )
-        db.add(db_query)
-        db.commit()
-        db.refresh(db_query)
-        return db_query
-
-    @staticmethod
-    def get_wallet_queries(
-        db: Session, 
-        skip: int = 0, 
-        limit: int = 10
-    ) -> list[WalletQuery]:
-        return db.query(WalletQuery)\
-                .order_by(WalletQuery.created_at.desc())\
-                .offset(skip)\
-                .limit(limit)\
-                .all()
-
-    @staticmethod
-    def get_total_queries(db: Session) -> int:
-        return db.query(WalletQuery).count()
+    def get_multiple_wallets(self, addresses: list[str]) -> dict[str, Optional[WalletInfo]]:
+        results = {}
+        for addr in addresses:
+            try:
+                results[addr] = self.get_wallet_info(addr)
+            except TronAPIError as e:
+                results[addr] = None
+                logger.warning(f"Skipped address {addr} due to error: {str(e)}")
+        return results
