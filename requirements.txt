@@ -5,3 +5,4 @@ tronpy==2.4.0
 python-dotenv==1.0.0
 pybreaker==1.0.0
 EOT
+pydantic-settings
