@@ -51,7 +51,7 @@ def handle_app_errors(func: Callable) -> Callable:
             logger.error(f"Tron API error: {str(e)}\n{traceback.format_exc()}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Tron API service unavailable"
+                detail="API request failed"
             )
             
         except DatabaseError as e:

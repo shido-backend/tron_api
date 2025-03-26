@@ -17,7 +17,6 @@ class Settings(BaseSettings):
 
     # CACHE
     CACHE_ENABLED: bool = True
-    DEFAULT_CACHE_TTL: int = 300  # 5 минут
     CACHE_MAX_SIZE: int = 1000
     
     class Config:

@@ -1,10 +1,11 @@
 from functools import wraps
 from datetime import datetime, timedelta
-from typing import Callable, Optional, TypeVar
+from typing import Callable, Optional, TypeVar, Any
 import hashlib
 import pickle
 from app.config import settings
 import logging
+import inspect
 
 logger = logging.getLogger(__name__)
 T = TypeVar('T')
@@ -26,14 +27,22 @@ class CacheManager:
     
     @staticmethod
     def _generate_key(func: Callable, *args, **kwargs) -> str:
-        args_str = pickle.dumps((args, kwargs))
+        if args and inspect.ismethod(func):
+            args = args[1:]  
+        
+        try:
+            args_str = pickle.dumps((args, kwargs))
+        except (pickle.PicklingError, TypeError):
+            args_str = f"{args!r}:{kwargs!r}".encode('utf-8')
+        
         return f"{func.__module__}.{func.__name__}:{hashlib.md5(args_str).hexdigest()}"
     
     def cached(
         self, 
         ttl: int = 300, 
         max_size: int = 1000,
-        key_prefix: Optional[str] = None
+        key_prefix: Optional[str] = None,
+        ignore_self: bool = True  
     ) -> Callable[[Callable[..., T]], Callable[..., T]]:
         
         def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -41,8 +50,13 @@ class CacheManager:
             def wrapper(*args, **kwargs) -> T:
                 if not settings.CACHE_ENABLED:
                     return func(*args, **kwargs)
+
+                if ignore_self and args and inspect.ismethod(func):
+                    cache_args = args[1:]
+                else:
+                    cache_args = args
                 
-                cache_key = key_prefix or self._generate_key(func, *args, **kwargs)
+                cache_key = key_prefix or self._generate_key(func, *cache_args, **kwargs)
 
                 if cache_key in self._cache_store:
                     entry = self._cache_store[cache_key]
